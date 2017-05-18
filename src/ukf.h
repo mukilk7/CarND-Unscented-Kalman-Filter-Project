@@ -12,6 +12,19 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
 class UKF {
+
+private:
+  /**
+  * generate augmented sigma points around the mean using lambda
+  */
+  MatrixXd GenerateAugmentedSigmaPoints();
+  /**
+  * sigma point prediction using CTRV model
+  */
+  void SigmaPointPrediction(const MatrixXd Xsig_aug, const double dt);
+
+  Tools tools;
+
 public:
 
   ///* initially set to false, set to true in first call of ProcessMeasurement
@@ -64,6 +77,9 @@ public:
 
   ///* Augmented state dimension
   int n_aug_;
+
+  ///* Number of sigma points
+  int n_sigpts_;
 
   ///* Sigma point spreading parameter
   double lambda_;

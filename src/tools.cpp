@@ -30,3 +30,11 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
   rmse = rmse.array().sqrt();
   return rmse;
 }
+
+float Tools::NormalizeAngle(float a) {
+  //deterministically running normalization logic
+  if (fabs(a) > M_PI) {
+    a = a - (round(a / (2 * M_PI)) * (2 * M_PI));
+  }
+  return a;
+}
