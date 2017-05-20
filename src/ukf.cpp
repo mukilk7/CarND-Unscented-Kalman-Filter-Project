@@ -119,6 +119,21 @@ void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
     return;
   }
 
+  float delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
+
+  /*** PREDICTION **`*/
+
+  Prediction(delta_t);
+
+
+  /*** UPDATE ***/
+  if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    // Radar updates
+    UpdateRadar(meas_package);
+  } else {
+    // Laser updates
+    UpdateLidar(meas_package);
+  }
 }
 
 MatrixXd UKF::GenerateAugmentedSigmaPoints() {
@@ -162,7 +177,7 @@ MatrixXd UKF::GenerateAugmentedSigmaPoints() {
   return Xsig_aug;
 }
 
-void UKF::SigmaPointPrediction(const MatrixXd Xsig_aug, const double delta_t) {
+void UKF::PredictSigmaPoints(const MatrixXd Xsig_aug, const double delta_t) {
   for (int i = 0; i < Xsig_aug.cols(); i++) {
     //extract values for better readability
     double p_x = Xsig_aug(0,i);
@@ -218,7 +233,7 @@ void UKF::Prediction(double delta_t) {
   MatrixXd Xsig_aug = GenerateAugmentedSigmaPoints();
 
   //Predict Sigma Points
-  SigmaPointPrediction(Xsig_aug, delta_t);
+  PredictSigmaPoints(Xsig_aug, delta_t);
 
   //Predict state mean
   x_.fill(0);
@@ -235,6 +250,34 @@ void UKF::Prediction(double delta_t) {
     x_diff(3) = tools.NormalizeAngle(x_diff(3));
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose();
   }
+}
+
+/*
+* n_z -> measurement space dimension
+* n_x -> model space dimension
+* Zsig -> Sigma points in measurement space
+* z -> Measurement update from the sensor
+* z_pred -> Predicted measurement
+* S -> Predicted measurement covariance
+*/
+void UKF::GenericUpdate(int n_x, int n_z, MatrixXd Zsig, VectorXd z, VectorXd z_pred, MatrixXd S) {
+  //calculate cross correlation matrix
+  MatrixXd Tc = MatrixXd::Zero(n_x, n_z);
+  for (int i = 0; i < n_sigpts_; i++) {
+      VectorXd xdiff = Xsig_pred_.col(i) - x_;
+      VectorXd zdiff = Zsig.col(i) - z_pred;
+      Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
+  }
+  
+  //calculate Kalman gain K;
+  MatrixXd K = MatrixXd::Zero(n_x, n_z);
+  K = Tc * S.inverse();
+  
+  //update state mean
+  x_ = x_ + K * (z - z_pred);
+  
+  //update covariance matrix
+  P_ = P_ - K * S * K.transpose();
 }
 
 /**

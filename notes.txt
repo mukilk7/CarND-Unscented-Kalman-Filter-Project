@@ -1,0 +1,20 @@
+*** GOAL ***
+
+* We use the CTRV model in this project to track a bicycle traveling around the car in a curvy path.
+
+*** PREDICTION ***
+
+* Instead of using a linear process model to predict the next state from the previous state, we use the unscented transformation.
+* What is the unscented transformation?
+  - It first samples some points around the error ellipse surrounding the mean state at time 'k'
+  - It then translates each of these points to state 'k+1' by running through the CTRV model equations
+  - The CTRV state prediction functions are non-linear in nature. That is why we go through all this trouble.
+  - It then computes the mean and covariance for these translated sample points
+  - This serves as a useful gaussian approximation of the non-linear error ellipse
+  - Along the way we also augment the CTRV mean state vector to add the longitudinal acceleration and yaw acceleration components which the UKF will predict. The covariance matrix will then compute the non-linear acceleration noises using the same unscented transformation as above for the other state. Neato!
+  
+*** UPDATE ***
+
+* Convert predicted state in CTRV space to measurement space for (a) Lidar and (b) Radar, using an appropriate measurement model (h in the lectures).
+* We again use the unscented transformation in lieu of an actual measurement model. We reuse the same sigma points from the previous prediction step and translate them to the appropriate lidar or radar measurement space. We also ignore the noise augmentation because the measurement noise has a purely additive effect in the measurement model.
+

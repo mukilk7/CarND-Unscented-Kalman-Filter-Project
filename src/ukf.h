@@ -21,7 +21,12 @@ private:
   /**
   * sigma point prediction using CTRV model
   */
-  void SigmaPointPrediction(const MatrixXd Xsig_aug, const double dt);
+  void PredictSigmaPoints(const MatrixXd Xsig_aug, const double dt);
+
+  /**
+  * Generic kalman filter update for radar and lidar
+  */
+  void GenericUpdate(int n_x, int n_z, MatrixXd Zsig, VectorXd z, VectorXd z_pred, MatrixXd S);
 
   Tools tools;
 
