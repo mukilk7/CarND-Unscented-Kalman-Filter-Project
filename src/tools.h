@@ -25,6 +25,8 @@ public:
   */
   float NormalizeAngle(float input_angle);
 
+  Eigen::VectorXd CartesianToPolar(const Eigen::VectorXd z);
+
 };
 
 #endif /* TOOLS_H_ */

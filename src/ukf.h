@@ -23,11 +23,6 @@ private:
   */
   void PredictSigmaPoints(const MatrixXd Xsig_aug, const double dt);
 
-  /**
-  * Generic kalman filter update for radar and lidar
-  */
-  void GenericUpdate(int n_x, int n_z, MatrixXd Zsig, VectorXd z, VectorXd z_pred, MatrixXd S);
-
   Tools tools;
 
 public:
@@ -49,6 +44,15 @@ public:
 
   ///* predicted sigma points matrix
   MatrixXd Xsig_pred_;
+
+  ///* Laser measurement model matrix
+  MatrixXd H_laser_;
+
+  ///* Laser measurement covariance
+  MatrixXd R_laser_;
+
+  ///* Radar measurement covariance
+  MatrixXd R_radar_;  
 
   ///* time when the state is true, in us
   long long time_us_;
@@ -82,6 +86,12 @@ public:
 
   ///* Augmented state dimension
   int n_aug_;
+
+  ///* Laser measurement dimension
+  int n_z_laser_;
+
+  ///* Laser measurement dimension
+  int n_z_radar_;
 
   ///* Number of sigma points
   int n_sigpts_;

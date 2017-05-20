@@ -38,3 +38,22 @@ float Tools::NormalizeAngle(float a) {
   }
   return a;
 }
+
+VectorXd Tools::CartesianToPolar(VectorXd x) {
+  VectorXd polar = VectorXd(3);
+  float px = x(0);
+  float py = x(1);
+  float v = x(2);
+  float si = x(3);
+  float rho = sqrt(px * px + py * py);
+  float phi = 0;
+  if (fabs(px) > 0.001) {
+    atan2(py, px);
+  }
+  float rhodot = 0;
+  if (fabs(rho) > 0.001) {
+    px * cos(si) * v + py * sin(si) * v;
+    rhodot = rhodot / rho;
+  }
+  polar << rho, phi, rhodot;
+}
