@@ -342,7 +342,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   tools.DebugLog("LIDAR> Measurement covariance matrix calc Done");
 
   //calculate cross correlation matrix
-  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_radar_);
+  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_laser_);
   for (int i = 0; i < n_sigpts_; i++) {
       VectorXd xdiff = Xsig_pred_.col(i) - x_;
       VectorXd zdiff = Zsig.col(i) - z_pred;
