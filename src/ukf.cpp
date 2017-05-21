@@ -8,6 +8,11 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::vector;
 
+
+UKF::UKF(Tools t): UKF() {
+  tools = t;
+}
+
 /**
  * Initializes Unscented Kalman filter
  */
@@ -137,17 +142,23 @@ void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
 
   /*** PREDICTION **`*/
 
+  tools.DebugLog("Calling state prediction...");
   Prediction(delta_t);
-
 
   /*** UPDATE ***/
   if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
     // Radar updates
+    tools.DebugLog("Calling radar update...");
     UpdateRadar(meas_package);
   } else {
     // Laser updates
+    tools.DebugLog("Calling lidar update...");
     UpdateLidar(meas_package);
   }
+
+  std::cout << "meas = " << meas_package.raw_measurements_ << std::endl;
+  std::cout << "x_ = " << x_ << std::endl;
+  std::cout << "P_ = " << P_ << std::endl;
 }
 
 MatrixXd UKF::GenerateAugmentedSigmaPoints() {
@@ -266,6 +277,30 @@ void UKF::Prediction(double delta_t) {
   }
 }
 
+void UKF::GenericKalmanUpdate(VectorXd z, VectorXd z_pred, MatrixXd Zsig, MatrixXd S, MatrixXd Tc, double &NIS_out) {
+  //calculate Kalman gain K;
+  MatrixXd K = MatrixXd::Zero(n_x_, z.size());
+  K = Tc * S.inverse();
+  
+  tools.DebugLog("Kalman gain calc Done");
+
+  //update state mean
+  VectorXd y = (z - z_pred);
+  x_ = x_ + K * y;
+
+  tools.DebugLog("Mean state update Done");
+
+  //update covariance matrix
+  P_ = P_ - K * S * K.transpose();
+
+  tools.DebugLog("state covariance matrix update Done");
+
+  //Calculate NIS
+  NIS_out = y.transpose() * S.inverse() * y;
+
+  tools.DebugLog("NIS_out calc Done");
+}
+
 /**
  * Updates the state and the state covariance matrix using a laser measurement.
  * @param {MeasurementPackage} meas_package
@@ -278,25 +313,45 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   * Also calculate the lidar NIS.
   */
 
-  //transform prediction in ctrv space to laser measurement space linearly
-  VectorXd z_pred = H_laser_ * x_;
+  tools.DebugLog("LIDAR> Starting lidar update");
 
-  //calculate kalman variables for update
-  VectorXd y = meas_package.raw_measurements_ - z_pred;
-  MatrixXd Ht = H_laser_.transpose();
-  MatrixXd S = H_laser_ * P_ * Ht + R_laser_;
-  MatrixXd Si = S.inverse();
-  MatrixXd PHt = P_ * Ht;
-  MatrixXd K = PHt * Si;
+  VectorXd z = meas_package.raw_measurements_;
 
-  //new mean state estimate
-  x_ = x_ + (K * y);
-  MatrixXd I = MatrixXd::Identity(n_x_, n_x_);
-  //new state covariance
-  P_ = (I - K * H_laser_) * P_;
+  //transform prediction in ctrv space to radar measurement space
+  MatrixXd Zsig = MatrixXd::Zero(n_z_laser_, n_sigpts_);
+  for (int i = 0; i < n_sigpts_; i++) {
+    Zsig.col(i) << Xsig_pred_(0, i), Xsig_pred_(1, i);
+  }
+  tools.DebugLog("LIDAR> Prediction to Lidar Meas Conversion Done");
 
-  //calculate NIS
-  NIS_laser_ = y.transpose() * Si * y;
+  //calculate mean predicted measurement
+  VectorXd z_pred = VectorXd::Zero(n_z_laser_);
+  for (int i = 0; i < n_sigpts_; i++) {
+      z_pred = z_pred + Zsig.col(i) * weights_(i);
+  }
+  tools.DebugLog("LIDAR> Mean pred measurement calc Done");
+
+  //calculate measurement covariance matrix S
+  MatrixXd S = MatrixXd::Zero(n_z_laser_,n_z_laser_);
+  for (int i = 0; i < n_sigpts_; i++) {
+      VectorXd zdiff = Zsig.col(i) - z_pred;
+      S = S + weights_(i) * zdiff * zdiff.transpose();
+  }
+  S = S + R_laser_;
+
+  tools.DebugLog("LIDAR> Measurement covariance matrix calc Done");
+
+  //calculate cross correlation matrix
+  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_radar_);
+  for (int i = 0; i < n_sigpts_; i++) {
+      VectorXd xdiff = Xsig_pred_.col(i) - x_;
+      VectorXd zdiff = Zsig.col(i) - z_pred;
+      Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
+  }
+
+  tools.DebugLog("LIDAR> Cross correlation matrix calc Done");
+
+  GenericKalmanUpdate(z, z_pred, Zsig, S, Tc, NIS_laser_);
 }
 
 /**
@@ -311,20 +366,26 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   * Also calculate the radar NIS.
   */
 
+  tools.DebugLog("RADAR> Starting radar update");
+
   VectorXd z = meas_package.raw_measurements_;
 
   //transform prediction in ctrv space to radar measurement space
-  MatrixXd Zsig = MatrixXd(n_z_radar_, n_sigpts_);
+  MatrixXd Zsig = MatrixXd::Zero(n_z_radar_, n_sigpts_);
   for (int i = 0; i < n_sigpts_; i++) {
-    Zsig.col(i) = tools.CartesianToPolar(Xsig_pred_.col(i));
+    VectorXd c2p = VectorXd(n_z_radar_);
+    tools.CartesianToPolar(Xsig_pred_.col(i), c2p);
+    Zsig.col(i) = c2p;
   }
+  tools.DebugLog("RADAR> Prediction to Radar Meas Conversion Done");
 
   //calculate mean predicted measurement
   VectorXd z_pred = VectorXd::Zero(n_z_radar_);
   for (int i = 0; i < n_sigpts_; i++) {
       z_pred = z_pred + Zsig.col(i) * weights_(i);
   }
-  
+  tools.DebugLog("RADAR> Mean pred measurement calc Done");
+
   //calculate measurement covariance matrix S
   MatrixXd S = MatrixXd::Zero(n_z_radar_,n_z_radar_);
   for (int i = 0; i < n_sigpts_; i++) {
@@ -333,6 +394,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       S = S + weights_(i) * zdiff * zdiff.transpose();
   }
   S = S + R_radar_;
+
+  tools.DebugLog("RADAR> Measurement covariance matrix calc Done");
 
   //calculate cross correlation matrix
   MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_radar_);
@@ -344,17 +407,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
   }
 
-  //calculate Kalman gain K;
-  MatrixXd K = MatrixXd::Zero(n_x_, n_z_radar_);
-  K = Tc * S.inverse();
-  
-  //update state mean
-  VectorXd y = (z - z_pred);
-  x_ = x_ + K * y;
-  
-  //update covariance matrix
-  P_ = P_ - K * S * K.transpose();
+  tools.DebugLog("RADAR> Cross correlation matrix calc Done");
 
-  //Calculate NIS
-  NIS_radar_ = y.transpose() * S.inverse() * y;
+  GenericKalmanUpdate(z, z_pred, Zsig, S, Tc, NIS_radar_);
 }

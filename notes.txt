@@ -18,3 +18,14 @@
 * Convert predicted state in CTRV space to measurement space for (a) Lidar and (b) Radar, using an appropriate measurement model (h in the lectures).
 * We again use the unscented transformation in lieu of an actual measurement model. We reuse the same sigma points from the previous prediction step and translate them to the appropriate lidar or radar measurement space. We also ignore the noise augmentation because the measurement noise has a purely additive effect in the measurement model.
 
+*** DATA ***
+
+Radar = <sensor_type, rho_measured, phi_measured, rhodot_measured, timestamp, x_groundtruth, y_groundtruth, vx_groundtruth, vy_groundtruth, yaw_groundtruth, yawrate_groundtruth>
+
+Laser = <sensor_type, x_measured, y_measured, timestamp, x_groundtruth, y_groundtruth, vx_groundtruth, vy_groundtruth, yaw_groundtruth, yawrate_groundtruth>
+
+*** CHECKING ***
+
+* NIS values follow a chi-squared distribution.
+  - NIS_Radar => 5%ile <= 0.352 && 95%ile <= 7.815
+  - NIS_Laser => 5%ile <= 0.103 && 95%ile <= 5.991

@@ -39,21 +39,37 @@ float Tools::NormalizeAngle(float a) {
   return a;
 }
 
-VectorXd Tools::CartesianToPolar(VectorXd x) {
-  VectorXd polar = VectorXd(3);
+void Tools::CartesianToPolar(const VectorXd &x, VectorXd &out) {
   float px = x(0);
   float py = x(1);
   float v = x(2);
   float si = x(3);
   float rho = sqrt(px * px + py * py);
   float phi = 0;
-  if (fabs(px) > 0.001) {
+  if (fabs(px) > 0.0001) {
     atan2(py, px);
   }
   float rhodot = 0;
-  if (fabs(rho) > 0.001) {
+  if (fabs(rho) > 0.0001) {
     px * cos(si) * v + py * sin(si) * v;
     rhodot = rhodot / rho;
   }
-  polar << rho, phi, rhodot;
+  printf("%f, %f, %f\n", rho, phi, rhodot);
+  if (rho > 1000) {
+    printf("*** px = %f, py = %f\n", px, py);
+  } else {
+    printf("px = %f, py = %f\n", px, py);
+  }
+  out << rho, phi, rhodot;
+}
+
+void Tools::DebugLog(const char *sfmt, ...) {
+  if (enableDebugLogging == true) {
+    printf("[%s:%d] ", __FUNCTION__, __LINE__);
+    va_list args;
+    va_start(args, sfmt);
+    vprintf(sfmt, args);
+    va_end(args);
+    printf("\n");
+  }
 }

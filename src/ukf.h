@@ -23,6 +23,11 @@ private:
   */
   void PredictSigmaPoints(const MatrixXd Xsig_aug, const double dt);
 
+  /**
+  * Generic kalman filter update code common to lidar and radar
+  */
+  void GenericKalmanUpdate(VectorXd z, VectorXd z_pred, MatrixXd Zsig, MatrixXd S, MatrixXd Tc, double &NIS_out);
+
   Tools tools;
 
 public:
@@ -109,6 +114,8 @@ public:
    * Constructor
    */
   UKF();
+
+  UKF(Tools t);
 
   /**
    * Destructor

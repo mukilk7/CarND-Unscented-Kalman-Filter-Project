@@ -1,6 +1,7 @@
 #ifndef TOOLS_H_
 #define TOOLS_H_
 #include <vector>
+#include <cstdarg>
 #include "Eigen/Dense"
 
 class Tools {
@@ -15,6 +16,8 @@ public:
   */
   virtual ~Tools();
 
+  bool enableDebugLogging = false;
+
   /**
   * A helper method to calculate RMSE.
   */
@@ -25,7 +28,9 @@ public:
   */
   float NormalizeAngle(float input_angle);
 
-  Eigen::VectorXd CartesianToPolar(const Eigen::VectorXd z);
+  void CartesianToPolar(const Eigen::VectorXd &x, Eigen::VectorXd &out);
+
+  void DebugLog(const char *sfmt, ...);
 
 };
 

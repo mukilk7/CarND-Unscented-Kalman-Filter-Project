@@ -52,6 +52,11 @@ void check_files(ifstream& in_file, string& in_name,
 
 int main(int argc, char* argv[]) {
 
+  Tools tools;
+  tools.enableDebugLogging = true;
+
+  tools.DebugLog("%s", "testing!!");
+
   check_arguments(argc, argv);
 
   string in_file_name_ = argv[1];
@@ -130,7 +135,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Create a UKF instance
-  UKF ukf;
+  UKF ukf(tools);
 
   // used to compute the RMSE later
   vector<VectorXd> estimations;
@@ -160,7 +165,12 @@ int main(int argc, char* argv[]) {
 
   for (size_t k = 0; k < number_of_measurements; ++k) {
     // Call the UKF-based fusion
+
+    tools.DebugLog("calling ProcessMeasurement - %d", k);
+
     ukf.ProcessMeasurement(measurement_pack_list[k]);
+
+    tools.DebugLog("completed ProcessMeasurement");
 
     // timestamp
     out_file_ << measurement_pack_list[k].timestamp_ << "\t"; // pos1 - est
@@ -220,7 +230,6 @@ int main(int argc, char* argv[]) {
   }
 
   // compute the accuracy (RMSE)
-  Tools tools;
   cout << "RMSE" << endl << tools.CalculateRMSE(estimations, ground_truth) << endl;
 
   // close files
