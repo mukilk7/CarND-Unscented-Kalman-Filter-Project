@@ -111,9 +111,8 @@ UKF::~UKF() {}
  */
 void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
 
-  if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == false) {
-    return;
-  } else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_ == false) {
+  if ((meas_package.sensor_type_ == MeasurementPackage::RADAR && !use_radar_) ||
+    (meas_package.sensor_type_ == MeasurementPackage::LASER && !use_laser_)) {
     return;
   }
 
@@ -161,11 +160,18 @@ void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
     UpdateLidar(meas_package);
   }
 
-  std::cout << "meas = " << meas_package.raw_measurements_ << std::endl;
-  std::cout << "x_ = " << x_ << std::endl;
-  std::cout << "P_ = " << P_ << std::endl;
+  if (tools.enableDebugLogging) {
+    std::cout << "meas = " << meas_package.raw_measurements_ << std::endl;
+    std::cout << "x_ = " << x_ << std::endl;
+    std::cout << "P_ = " << P_ << std::endl;
+  }
 }
 
+/**
+* Augments CTRV model state with noise parameters and
+* generates sigma points controlled by spread parameter,
+* lambda.
+*/
 MatrixXd UKF::GenerateAugmentedSigmaPoints() {
 
   //create augmented mean vector
@@ -207,6 +213,12 @@ MatrixXd UKF::GenerateAugmentedSigmaPoints() {
   return Xsig_aug;
 }
 
+/**
+* Converts sigma points to CTRV model using the process model
+* equations.
+* @param {MatrixXd} Xsig_aug the augmented state matrix
+* @param {double} delta_t the time elapsed between measurements
+*/
 void UKF::PredictSigmaPoints(const MatrixXd Xsig_aug, const double delta_t) {
   for (int i = 0; i < Xsig_aug.cols(); i++) {
     //extract values for better readability
@@ -282,35 +294,82 @@ void UKF::Prediction(double delta_t) {
   }
 }
 
-void UKF::GenericKalmanUpdate(VectorXd z, VectorXd z_pred, MatrixXd Zsig, MatrixXd S, MatrixXd Tc, double &NIS_out) {
+/**
+* Implements generic kalman filter update code for LIDAR and RADAR
+* sensors. For radar, it automatically performs appropriate angle
+* normalizations.
+* @param {bool} isRadar indicates if the update is for RADAR sensor
+* @param {VectorXd} z the measurement vector from the sensor
+* @param {MatrixXd} Zsig the predicted state in measurement space
+*/
+void UKF::GenericKalmanUpdate(bool isRadar, VectorXd z, MatrixXd Zsig) {
+  /**
+  * Use appropriate sensor data to update the belief about the object's
+  * position. Modify the state vector, x_, and covariance, P_.
+  *
+  * Also calculates the appropriate NIS.
+  */
+  int n_z = (isRadar)? n_z_radar_: n_z_laser_;
+  MatrixXd R = (isRadar)? R_radar_: R_laser_;
+
+  //calculate mean predicted measurement
+  VectorXd z_pred = VectorXd::Zero(n_z);
+  for (int i = 0; i < n_sigpts_; i++) {
+      z_pred = z_pred + Zsig.col(i) * weights_(i);
+  }
+
+  //calculate measurement covariance matrix S
+  MatrixXd S = MatrixXd::Zero(n_z, n_z);
+  for (int i = 0; i < n_sigpts_; i++) {
+      VectorXd zdiff = Zsig.col(i) - z_pred;
+      if (isRadar) {
+        zdiff(1) = tools.NormalizeAngle(zdiff(1));  
+      }
+      S = S + weights_(i) * zdiff * zdiff.transpose();
+  }
+  S = S + R;
+
+  //calculate cross correlation matrix
+  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
+  for (int i = 0; i < n_sigpts_; i++) {
+      VectorXd xdiff = Xsig_pred_.col(i) - x_;
+      VectorXd zdiff = Zsig.col(i) - z_pred;
+      if (isRadar) {
+        xdiff(3) = tools.NormalizeAngle(xdiff(3));
+        zdiff(1) = tools.NormalizeAngle(zdiff(1));
+      }
+      Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
+  }
+
   //calculate Kalman gain K;
   MatrixXd K = MatrixXd::Zero(n_x_, z.size());
   K = Tc * S.inverse();
 
   //update state mean
   VectorXd y = (z - z_pred);
+  if (isRadar) {
+    y(1) = tools.NormalizeAngle(y(1));
+  }
   x_ = x_ + K * y;
 
   //update covariance matrix
   P_ = P_ - K * S * K.transpose();
 
   //Calculate NIS
-  NIS_out = y.transpose() * S.inverse() * y;
+  if (isRadar) {
+    NIS_radar_ = y.transpose() * S.inverse() * y;  
+  } else {
+    NIS_laser_ = y.transpose() * S.inverse() * y;  
+  }
 }
 
 /**
- * Updates the state and the state covariance matrix using a laser measurement.
+ * Transforms prediction state vector to LIDAR measurement
+ * space and calls a helper to update new state vector x_,
+ * compute the state covariance P_ and NIS laser.
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
-  /**
-  * Use lidar data to update the belief about the object's
-  * position. Modify the state vector, x_, and covariance, P_.
-  *
-  * Also calculate the lidar NIS.
-  */
-
-  VectorXd z = meas_package.raw_measurements_;
 
   //transform prediction in ctrv space to lidar measurement space
   MatrixXd Zsig = MatrixXd::Zero(n_z_laser_, n_sigpts_);
@@ -318,46 +377,19 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
     Zsig.col(i) << Xsig_pred_(0, i), Xsig_pred_(1, i);
   }
 
-  //calculate mean predicted measurement
-  VectorXd z_pred = VectorXd::Zero(n_z_laser_);
-  for (int i = 0; i < n_sigpts_; i++) {
-      z_pred = z_pred + Zsig.col(i) * weights_(i);
-  }
+  
+  GenericKalmanUpdate(false, meas_package.raw_measurements_, Zsig);
 
-  //calculate measurement covariance matrix S
-  MatrixXd S = MatrixXd::Zero(n_z_laser_,n_z_laser_);
-  for (int i = 0; i < n_sigpts_; i++) {
-      VectorXd zdiff = Zsig.col(i) - z_pred;
-      S = S + weights_(i) * zdiff * zdiff.transpose();
-  }
-  S = S + R_laser_;
-
-  //calculate cross correlation matrix
-  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_laser_);
-  for (int i = 0; i < n_sigpts_; i++) {
-      VectorXd xdiff = Xsig_pred_.col(i) - x_;
-      VectorXd zdiff = Zsig.col(i) - z_pred;
-      Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
-  }
-
-  GenericKalmanUpdate(z, z_pred, Zsig, S, Tc, NIS_laser_);
-
-  std::cout << "NIS_laser = " << NIS_laser_ << std::endl;
+  tools.DebugLog("NIS_Laser = %lf", NIS_laser_);
 }
 
 /**
- * Updates the state and the state covariance matrix using a radar measurement.
+ * Transforms prediction state vector to RADAR measurement
+ * space and calls a helper to update new state vector x_,
+ * compute the state covariance P_ and NIS radar.
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
-  /**
-  * Use radar data to update the belief about the object's
-  * position. Modify the state vector, x_, and covariance, P_.
-  *
-  * Also calculate the radar NIS.
-  */
-
-  VectorXd z = meas_package.raw_measurements_;
 
   //transform prediction in ctrv space to radar measurement space
   MatrixXd Zsig = MatrixXd::Zero(n_z_radar_, n_sigpts_);
@@ -367,32 +399,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     Zsig.col(i) = c2p;
   }
 
-  //calculate mean predicted measurement
-  VectorXd z_pred = VectorXd::Zero(n_z_radar_);
-  for (int i = 0; i < n_sigpts_; i++) {
-      z_pred = z_pred + Zsig.col(i) * weights_(i);
-  }
+  GenericKalmanUpdate(true, meas_package.raw_measurements_, Zsig);  
 
-  //calculate measurement covariance matrix S
-  MatrixXd S = MatrixXd::Zero(n_z_radar_,n_z_radar_);
-  for (int i = 0; i < n_sigpts_; i++) {
-      VectorXd zdiff = Zsig.col(i) - z_pred;
-      zdiff(1) = tools.NormalizeAngle(zdiff(1));
-      S = S + weights_(i) * zdiff * zdiff.transpose();
-  }
-  S = S + R_radar_;
-
-  //calculate cross correlation matrix
-  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_radar_);
-  for (int i = 0; i < n_sigpts_; i++) {
-      VectorXd xdiff = Xsig_pred_.col(i) - x_;
-      xdiff(3) = tools.NormalizeAngle(xdiff(3));
-      VectorXd zdiff = Zsig.col(i) - z_pred;
-      zdiff(1) = tools.NormalizeAngle(zdiff(1));
-      Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
-  }
-
-  GenericKalmanUpdate(z, z_pred, Zsig, S, Tc, NIS_radar_);
-
-  std::cout << "NIS_radar = " << NIS_radar_ << std::endl;
+  tools.DebugLog("NIS_Radar = %lf", NIS_radar_);
 }

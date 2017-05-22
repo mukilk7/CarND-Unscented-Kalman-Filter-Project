@@ -46,11 +46,11 @@ void Tools::CartesianToPolar(const VectorXd &x, VectorXd &out) {
   float si = x(3);
   float rho = sqrt(px * px + py * py);
   float phi = 0;
-  if (fabs(px) > 0.0001) {
-    atan2(py, px);
+  if (fabs(px) > 0.001) {
+    phi = atan2(py, px);
   }
   float rhodot = 0;
-  if (fabs(rho) > 0.0001) {
+  if (fabs(rho) > 0.001) {
     rhodot = px * cos(si) * v + py * sin(si) * v;
     rhodot = rhodot / rho;
   }
@@ -58,7 +58,7 @@ void Tools::CartesianToPolar(const VectorXd &x, VectorXd &out) {
 }
 
 void Tools::DebugLog(const char *sfmt, ...) {
-  if (enableDebugLogging == true) {
+  if (enableDebugLogging) {
     printf("[%s:%d] ", __FUNCTION__, __LINE__);
     va_list args;
     va_start(args, sfmt);

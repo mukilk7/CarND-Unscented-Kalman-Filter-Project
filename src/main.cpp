@@ -53,7 +53,10 @@ void check_files(ifstream& in_file, string& in_name,
 int main(int argc, char* argv[]) {
 
   Tools tools;
-  tools.enableDebugLogging = true;
+  /*
+  * NOTE: Enable this parameter to see intermediate output.
+  */
+  tools.enableDebugLogging = false;
 
   check_arguments(argc, argv);
 

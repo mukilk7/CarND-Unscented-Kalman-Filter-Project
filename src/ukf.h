@@ -26,7 +26,7 @@ private:
   /**
   * Generic kalman filter update code common to lidar and radar
   */
-  void GenericKalmanUpdate(VectorXd z, VectorXd z_pred, MatrixXd Zsig, MatrixXd S, MatrixXd Tc, double &NIS_out);
+  void GenericKalmanUpdate(bool isRadar, VectorXd z, MatrixXd Zsig);
 
   Tools tools;
 
