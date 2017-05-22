@@ -50,10 +50,10 @@ UKF::UKF() {
               0, 1, 0, 0, 0;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.5;
+  std_a_ = 2.0;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.25;
+  std_yawdd_ = 0.3;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -150,17 +150,14 @@ void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
 
   /*** PREDICTION **`*/
 
-  tools.DebugLog("Calling state prediction...");
   Prediction(delta_t);
 
   /*** UPDATE ***/
   if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
     // Radar updates
-    tools.DebugLog("Calling radar update...");
     UpdateRadar(meas_package);
   } else {
     // Laser updates
-    tools.DebugLog("Calling lidar update...");
     UpdateLidar(meas_package);
   }
 
@@ -289,24 +286,16 @@ void UKF::GenericKalmanUpdate(VectorXd z, VectorXd z_pred, MatrixXd Zsig, Matrix
   //calculate Kalman gain K;
   MatrixXd K = MatrixXd::Zero(n_x_, z.size());
   K = Tc * S.inverse();
-  
-  tools.DebugLog("Kalman gain calc Done");
 
   //update state mean
   VectorXd y = (z - z_pred);
   x_ = x_ + K * y;
 
-  tools.DebugLog("Mean state update Done");
-
   //update covariance matrix
   P_ = P_ - K * S * K.transpose();
 
-  tools.DebugLog("state covariance matrix update Done");
-
   //Calculate NIS
   NIS_out = y.transpose() * S.inverse() * y;
-
-  tools.DebugLog("NIS_out calc  = %f", NIS_out);
 }
 
 /**
@@ -321,8 +310,6 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   * Also calculate the lidar NIS.
   */
 
-  tools.DebugLog("LIDAR> Starting lidar update");
-
   VectorXd z = meas_package.raw_measurements_;
 
   //transform prediction in ctrv space to lidar measurement space
@@ -330,14 +317,12 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   for (int i = 0; i < n_sigpts_; i++) {
     Zsig.col(i) << Xsig_pred_(0, i), Xsig_pred_(1, i);
   }
-  tools.DebugLog("LIDAR> Prediction to Lidar Meas Conversion Done");
 
   //calculate mean predicted measurement
   VectorXd z_pred = VectorXd::Zero(n_z_laser_);
   for (int i = 0; i < n_sigpts_; i++) {
       z_pred = z_pred + Zsig.col(i) * weights_(i);
   }
-  tools.DebugLog("LIDAR> Mean pred measurement calc Done");
 
   //calculate measurement covariance matrix S
   MatrixXd S = MatrixXd::Zero(n_z_laser_,n_z_laser_);
@@ -347,8 +332,6 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   }
   S = S + R_laser_;
 
-  tools.DebugLog("LIDAR> Measurement covariance matrix calc Done");
-
   //calculate cross correlation matrix
   MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_laser_);
   for (int i = 0; i < n_sigpts_; i++) {
@@ -357,9 +340,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
       Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
   }
 
-  tools.DebugLog("LIDAR> Cross correlation matrix calc Done");
-
   GenericKalmanUpdate(z, z_pred, Zsig, S, Tc, NIS_laser_);
+
+  std::cout << "NIS_laser = " << NIS_laser_ << std::endl;
 }
 
 /**
@@ -374,8 +357,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   * Also calculate the radar NIS.
   */
 
-  tools.DebugLog("RADAR> Starting radar update");
-
   VectorXd z = meas_package.raw_measurements_;
 
   //transform prediction in ctrv space to radar measurement space
@@ -385,14 +366,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     tools.CartesianToPolar(Xsig_pred_.col(i), c2p);
     Zsig.col(i) = c2p;
   }
-  tools.DebugLog("RADAR> Prediction to Radar Meas Conversion Done");
 
   //calculate mean predicted measurement
   VectorXd z_pred = VectorXd::Zero(n_z_radar_);
   for (int i = 0; i < n_sigpts_; i++) {
       z_pred = z_pred + Zsig.col(i) * weights_(i);
   }
-  tools.DebugLog("RADAR> Mean pred measurement calc Done");
 
   //calculate measurement covariance matrix S
   MatrixXd S = MatrixXd::Zero(n_z_radar_,n_z_radar_);
@@ -402,8 +381,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       S = S + weights_(i) * zdiff * zdiff.transpose();
   }
   S = S + R_radar_;
-
-  tools.DebugLog("RADAR> Measurement covariance matrix calc Done");
 
   //calculate cross correlation matrix
   MatrixXd Tc = MatrixXd::Zero(n_x_, n_z_radar_);
@@ -415,7 +392,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       Tc = Tc + weights_(i) * xdiff * zdiff.transpose();
   }
 
-  tools.DebugLog("RADAR> Cross correlation matrix calc Done");
-
   GenericKalmanUpdate(z, z_pred, Zsig, S, Tc, NIS_radar_);
+
+  std::cout << "NIS_radar = " << NIS_radar_ << std::endl;
 }

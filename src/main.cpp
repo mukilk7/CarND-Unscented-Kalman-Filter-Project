@@ -55,8 +55,6 @@ int main(int argc, char* argv[]) {
   Tools tools;
   tools.enableDebugLogging = true;
 
-  tools.DebugLog("%s", "testing!!");
-
   check_arguments(argc, argv);
 
   string in_file_name_ = argv[1];
@@ -169,10 +167,6 @@ int main(int argc, char* argv[]) {
     tools.DebugLog("calling ProcessMeasurement - %d", k);
 
     ukf.ProcessMeasurement(measurement_pack_list[k]);
-
-    std::cout << "gt = " << gt_pack_list[k].gt_values_ << std::endl;
-
-    tools.DebugLog("completed ProcessMeasurement");
 
     // timestamp
     out_file_ << measurement_pack_list[k].timestamp_ << "\t"; // pos1 - est
