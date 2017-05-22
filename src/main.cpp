@@ -170,6 +170,8 @@ int main(int argc, char* argv[]) {
 
     ukf.ProcessMeasurement(measurement_pack_list[k]);
 
+    std::cout << "gt = " << gt_pack_list[k].gt_values_ << std::endl;
+
     tools.DebugLog("completed ProcessMeasurement");
 
     // timestamp

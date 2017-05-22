@@ -110,6 +110,13 @@ UKF::~UKF() {}
  * either radar or laser.
  */
 void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
+
+  if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == false) {
+    return;
+  } else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_ == false) {
+    return;
+  }
+
   /*****************************************************************************
    *  Initialization
    ****************************************************************************/
@@ -139,6 +146,7 @@ void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
   }
 
   float delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
+  time_us_ = meas_package.timestamp_;
 
   /*** PREDICTION **`*/
 
@@ -164,13 +172,13 @@ void UKF::ProcessMeasurement(const MeasurementPackage meas_package) {
 MatrixXd UKF::GenerateAugmentedSigmaPoints() {
 
   //create augmented mean vector
-  VectorXd x_aug = VectorXd(n_aug_);
+  VectorXd x_aug = VectorXd::Zero(n_aug_);
 
   //create augmented state covariance
   MatrixXd P_aug = MatrixXd::Zero(n_aug_, n_aug_);
 
   //create sigma point matrix
-  MatrixXd Xsig_aug = MatrixXd(n_aug_, n_sigpts_);
+  MatrixXd Xsig_aug = MatrixXd::Zero(n_aug_, n_sigpts_);
 
   //create augmented mean state
   x_aug.head(n_x_) = x_;
@@ -298,7 +306,7 @@ void UKF::GenericKalmanUpdate(VectorXd z, VectorXd z_pred, MatrixXd Zsig, Matrix
   //Calculate NIS
   NIS_out = y.transpose() * S.inverse() * y;
 
-  tools.DebugLog("NIS_out calc Done");
+  tools.DebugLog("NIS_out calc  = %f", NIS_out);
 }
 
 /**
@@ -317,7 +325,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   VectorXd z = meas_package.raw_measurements_;
 
-  //transform prediction in ctrv space to radar measurement space
+  //transform prediction in ctrv space to lidar measurement space
   MatrixXd Zsig = MatrixXd::Zero(n_z_laser_, n_sigpts_);
   for (int i = 0; i < n_sigpts_; i++) {
     Zsig.col(i) << Xsig_pred_(0, i), Xsig_pred_(1, i);

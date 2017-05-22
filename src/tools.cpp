@@ -51,14 +51,8 @@ void Tools::CartesianToPolar(const VectorXd &x, VectorXd &out) {
   }
   float rhodot = 0;
   if (fabs(rho) > 0.0001) {
-    px * cos(si) * v + py * sin(si) * v;
+    rhodot = px * cos(si) * v + py * sin(si) * v;
     rhodot = rhodot / rho;
-  }
-  printf("%f, %f, %f\n", rho, phi, rhodot);
-  if (rho > 1000) {
-    printf("*** px = %f, py = %f\n", px, py);
-  } else {
-    printf("px = %f, py = %f\n", px, py);
   }
   out << rho, phi, rhodot;
 }
